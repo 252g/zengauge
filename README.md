@@ -1,112 +1,147 @@
 # zengauge
 
-ZEN Study（N高・S高などの学習サイト）のレポート進捗を、iPhone のホーム画面・ロック画面に
-ウィジェットで表示する。[Scriptable](https://scriptable.app/) のスクリプト 1 本で動き、PC は要らない。
+**ZEN Study のレポート進捗を、iPhone のホーム画面でひと目で。**
 
-PC（Mac / Windows）から進捗を取得して iCloud Drive 経由で渡す Python 版も同梱している。
+ZEN Study（N高・S高などで使われている学習サイト）の「今月のレポートがあと何本残っているか」を、
+iPhone のウィジェットに表示します。無料アプリ [Scriptable](https://scriptable.app/) で動き、PC は要りません。
 
-> 非公式のツールです。ZEN Study / N Lobby とは関係ありません。自分のアカウントでのみ使ってください。
-> 使っている API は公開されていないもので、予告なく変わることがあります。
+```
+┌──────────────────────────┐
+│ 11月レポート      あと4日 │
+│ 7 / 10      テスト 0/3   │
+│ ━━━━━━━━━━━━━━──────     │  ← 今月
+│ 期限 11/15 · 教材 94%    │
+│ 年間              53/64  │
+│ ━━━━━━━━━━━━━━━━━━──     │  ← 年間
+│                 18:30 更新│
+└──────────────────────────┘
+```
 
-## 表示する内容
+> [!NOTE]
+> 非公式のツールです。ZEN Study・N Lobby の運営元とは関係ありません。
+> 自分のアカウントでのみ使ってください。ZEN Study 側の仕様が変わると動かなくなることがあります。
 
-| | 小 | 中 | 大 |
-|---|---|---|---|
-| 今月のレポート（済み / 全体、締め切りまでの日数） | ○ | ○ | ○ |
-| 月間ゲージ・年間ゲージ（同じ幅で上下に並べる） | ○ | ○ | ○ |
-| 教材の進み（%） | ○ | ○ | ○ |
-| 残りの教科 | – | 4件 | 5行（テスト含む） |
-| 来月分・締めを過ぎた未完了の月 | – | – | ○ |
-| 更新時刻 | ○ | ○ | ○ |
+## できること
 
-ロック画面（インライン・円形・長方形）にも対応している。
-締め切りが 3 日以内になるとゲージが橙、過ぎると赤になる。
+- 今月のレポートの進み（済み / 全体）と、締め切りまでの日数
+- 今月と年間の進みをゲージで表示（締め切り 3 日前から橙、過ぎると赤）
+- 残っている教科と、それぞれの進み（中・大サイズ）
+- 定期テストの進み、来月分、締めを過ぎて終わっていない月（大サイズ）
+- ロック画面のウィジェットにも対応
+- 30 分ごとに自動で更新
 
-## iPhone だけで使う
+## はじめかた（iPhone だけ・5 分ほど）
 
-1. App Store から Scriptable を入れる。
-2. [`scriptable/ZEN Study進捗.js`](scriptable/ZEN%20Study進捗.js) の中身を Scriptable の新規スクリプトに貼り付け、
-   名前を「ZEN Study進捗」にする（iCloud Drive の `Scriptable` フォルダに置いてもよい）。
-3. スクリプトを実行して「スマホでログイン」を選ぶ。N Lobby のログイン画面が出るのでログインする。
-4. ホーム画面に Scriptable のウィジェットを置き、スクリプトに「ZEN Study進捗」を選ぶ。
+### 1. Scriptable を入れる
 
-ウィジェットは 30 分ごとに自分で更新する。ログインが切れると「ログインが切れています」と出て、
-タップするとログイン画面が開く。
+App Store で「[Scriptable](https://apps.apple.com/app/scriptable/id1405459188)」を入れます（無料）。
 
-### ログインの仕組み
+### 2. スクリプトを入れる
 
-ZEN Study のログインは `www.nnn.ed.nico/auth/n_lobby` → N Lobby → `/auth/n_lobby/callback` の順に進む。
-最初と最後を Scriptable の `Request` が行い、内蔵ブラウザには N Lobby の画面だけを出す
-（callback への移動は `WebView.shouldAllowRequest` で止めて、Scriptable 側で開き直す）。
-こうするとブラウザの中に閉じ込められる HttpOnly のセッション Cookie を受け取れるので、
-Scriptable のキーチェーンに保存してウィジェットが自分で取得できる。
+1. iPhone でこのページの [`scriptable/ZEN Study進捗.js`](scriptable/ZEN%20Study進捗.js) を開き、右上の「Raw」を押します。
+2. 表示された文字を全部選んでコピーします。
+3. Scriptable を開き、右上の「＋」を押して、コピーした文字を貼り付けます。
+4. 上の名前の部分を押して「**ZEN Study進捗**」に変え、「Done」を押します。
 
-- パスワードはスクリプトを通らず、保存もしない。
-- 保存するのはセッション Cookie だけで、Scriptable のキーチェーンに入る。
-- 読み取り専用。ZEN Study 側に書き込む API は使わない。
+### 3. ログインする
 
-## PC から渡す（任意）
+1. Scriptable の一覧で「ZEN Study進捗」を押して実行し、「**スマホでログイン**」を選びます。
+2. N Lobby のログイン画面が出るので、いつもどおりログインします。
+3. 「ログインできました」と出たら、左上のボタンで閉じます。
 
-PC（Mac / Windows）が 30 分ごとに進捗を取得し、iCloud Drive の Scriptable フォルダに書き出す。
-ウィジェットは PC の書き出しが 75 分以内ならそれを表示する。スマホでのログインがうまくいかないときに使う。
+### 4. ウィジェットを置く
 
-**ターミナルは使わない。** ダブルクリックだけで準備できる。
+1. ホーム画面の何もないところを長押しし、左上の「編集」→「ウィジェットを追加」を押します。
+2. 「Scriptable」を選び、好きな大きさのウィジェットを追加します。
+3. 追加したウィジェットを長押しして「ウィジェットを編集」を押し、**Script** で「ZEN Study進捗」を選びます。
 
-1. このページの緑の「Code」→「Download ZIP」でダウンロードし、ZIP を開く（できたフォルダは好きな場所に置いてよい）。
-2. フォルダの中の **Mac は `setup-mac.command`、Windows は `setup-windows.bat`** をダブルクリックする。
-3. 黒い画面が開いて準備が進む。途中でブラウザが開くので、ZEN Study にログインする。
-4. 「完了しました」と出たら終わり。画面は閉じてよい。
+これで完成です。
 
-ログインが切れたときも、同じファイルをもう一度ダブルクリックすればよい。
-自動更新をやめるときは `stop-mac.command` / `stop-windows.bat` をダブルクリックする。
+## よくある質問
 
-### 初めて開くときの注意
+**パスワードは大丈夫？**
+パスワードは N Lobby の画面に直接入れるだけで、スクリプトは読みませんし、保存もしません。
+保存するのはログイン状態を表す情報（Cookie）だけで、iPhone の中（Scriptable のキーチェーン）にしまわれます。
+ZEN Study 以外のサーバーには何も送りません。
 
-ネットから落としたファイルなので、最初の 1 回だけ確認が出る。
+**ZEN Study に何か書き込まれたりしない？**
+しません。進捗を読むだけです。
 
-- **Mac**: 「開けません」「Apple は検証できませんでした」と出たら「完了」を押し、
-  「システム設定」→「プライバシーとセキュリティ」を開いて、下の方の「このまま開く」を押す。
-- **Windows**: 「Windows によって PC が保護されました」と出たら「詳細情報」→「実行」を押す。
+**「ログインが切れています」と出た**
+しばらくするとログインの有効期限が切れます。ウィジェットを押すとログイン画面が開くので、もう一度ログインしてください。
+それまでは、最後に取れた数字がそのまま表示されます。
 
-### 必要なもの
+**締め切りの日付が違う気がする**
+ZEN Study に登録されている、その月で一番早いレポートの締め切りを表示しています。
 
-- Python 3.9 以上。Mac は標準のもので動く（入っていなければ、入れるよう案内する画面が出る）。
-  Windows は [python.org](https://www.python.org/downloads/) から入れ、最初の画面で「Add python.exe to PATH」にチェックを入れる。
-- Windows では「iCloud for Windows」で iCloud Drive を有効にしておく。
-- ログイン用のブラウザ（Chromium）は、最初のログインのときに自動で入る。
+**ウィジェットがすぐに変わらない**
+iPhone がウィジェットを更新するタイミングは iOS が決めるので、30 分より遅れることがあります。
+すぐ見たいときはウィジェットを押すと、最新の状態を大きく表示します。
 
-### ターミナルで使う場合
+**やめたいとき**
+Scriptable でスクリプトを実行し「ログイン情報を削除」を選んでから、スクリプトとウィジェットを消してください。
 
-ダウンロードしたフォルダの中で実行する。
+## PC でログインして QR コードで送る
+
+スマホでのログインがうまくいかないときは、PC（Mac / Windows）でログインして、
+QR コードで iPhone に送ることもできます。送ったあとはウィジェットが自分で更新するので、PC は要りません。
+
+1. このページ上の緑の「Code」→「Download ZIP」でダウンロードし、ZIP を開きます。
+2. フォルダの中の **Mac は `setup-mac.command`、Windows は `setup-windows.bat`** をダブルクリックします。
+3. 途中でブラウザが開くので、ZEN Study にログインします。
+4. QR コードが表示されたら、iPhone のカメラで読み取り、「Scriptable で開く」→「保存する」を押します。
+
+- 先に iPhone の Scriptable に「ZEN Study進捗」を入れておいてください（[はじめかた](#2-スクリプトを入れる)の 2 まで）。
+- ログインが切れたら、同じファイルをもう一度ダブルクリックして、新しい QR コードを読み取ります。
+- QR コードにはログイン情報が入っています。人に見せたり、撮影して送ったりしないでください。
+- 初めて開くときは、ネットから落としたファイルなので確認が出ます。
+  Mac は「システム設定」→「プライバシーとセキュリティ」の「このまま開く」、
+  Windows は「詳細情報」→「実行」で開けます。
+- Windows では [Python](https://www.python.org/downloads/)（最初の画面で「Add python.exe to PATH」にチェック）が必要です。
+  Mac は最初から入っているもので動きます。
+
+## 開発者向け
+
+<details>
+<summary>ログインの仕組み</summary>
+
+ZEN Study のログインは `www.nnn.ed.nico/auth/n_lobby` → N Lobby → `/auth/n_lobby/callback` の順に進みます。
+最初と最後を Scriptable の `Request` が行い、内蔵ブラウザには N Lobby の画面だけを出します
+（callback への移動は `WebView.shouldAllowRequest` で止めて、Scriptable 側で開き直します）。
+こうすると、ブラウザの中に閉じ込められる HttpOnly のセッション Cookie を受け取れるので、
+キーチェーンに保存してウィジェットが自分で取得できます。
+
+進捗は `https://api.nnn.ed.nico/v2/dashboard/report_progresses`（と月別の詳細）を GET で読んでいます。
+</details>
+
+<details>
+<summary>PC 版をコマンドで使う</summary>
+
+ダウンロードしたフォルダの中で実行します。Python 3.9 以上。
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+.venv/bin/python zengauge.py login
 ```
-
-以下、Mac は `.venv/bin/python zengauge.py`、Windows は `.venv\Scripts\python zengauge.py` を `zg` と書く。
 
 | コマンド | 内容 |
 |---|---|
-| `zg login` | Chromium が開くので ZEN Study にログインする。確認できたら閉じて保存し、1 回書き出す |
-| `zg sync` | 進捗を取得して書き出す |
-| `zg schedule` | 30 分ごとの自動更新を登録する（Mac は launchd、Windows はタスクスケジューラ）。`--off` で解除 |
-| `zg status` | ログインの有効・無効、書き出し先、最後の書き出し、自動更新の有無 |
-| `zg import <file>` | 既存のログイン情報を取り込む（Playwright の storageState.json か `name=value; ...` 形式の Cookie ファイル） |
-| `zg setup --scriptable-dir <dir>` | Scriptable の iCloud フォルダを指定する |
+| `login` | Chromium でログインして保存し、iPhone に送る QR コードを表示する（Chromium は初回に自動で入る） |
+| `qr` | 保存したログインの QR コードをもう一度表示する |
+| `status` | ログインの状態（有効期限の目安）と今月の進捗を表示する |
+| `import <file>` | 既存のログイン情報を取り込む（Playwright の storageState.json か `name=value; ...` 形式） |
 
-ログイン情報は Mac なら `~/Library/Application Support/zengauge/`、
-Windows なら `%APPDATA%\zengauge\` に保存し、リポジトリや iCloud には置かない。
-iCloud に書き出すのは進捗の数字だけ。
+QR コードの中身は `scriptable:///run/ZEN%20Study進捗?action=import&cookie=…` というリンクです。
+ログイン情報は Mac なら `~/Library/Application Support/zengauge/`、Windows なら `%APPDATA%\zengauge\` に保存します。
+</details>
 
-既知の問題: macOS では、launchd から動く Python が iCloud フォルダ内の古い書き出しファイルを
-消せないことがある（`com.apple.macl` による保護）。その場合ファイルが溜まるが、ウィジェットは一番新しいものを読む。
-
-## テスト
+<details>
+<summary>テスト</summary>
 
 ```bash
 python3 -m unittest discover -s tests
 ```
 
-テストは架空のデータだけを使う。Node があれば、Python の集計とウィジェットの JavaScript の集計が
-一致することも確かめる。
+架空のデータだけを使います。Node があれば、Python の集計とウィジェットの JavaScript の集計が一致することも確かめます。
+</details>

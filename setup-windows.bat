@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-rem ダブルクリックで zengauge の準備（PC 側）をすべて行う。ログインし直すときも、これをもう一度開く。
+rem ダブルクリックで ZEN Study にログインし、iPhone に送る QR コードを表示する。ログインし直すときも、これをもう一度開く。
 cd /d "%~dp0"
 echo === zengauge の準備 ===
 echo.
@@ -18,24 +18,20 @@ if not defined PY (
   goto fail
 )
 
-echo 1/4 準備用のフォルダを作っています…
+echo 1/3 準備用のフォルダを作っています…
 if not exist ".venv\Scripts\python.exe" (
   %PY% -m venv .venv || goto fail
 )
 
-echo 2/4 必要なものを入れています…
+echo 2/3 必要なものを入れています…
 ".venv\Scripts\python.exe" -m pip install --quiet --disable-pip-version-check -r requirements.txt || goto fail
 
-echo 3/4 ZEN Study にログインします。開いたブラウザでログインしてください。
+echo 3/3 ZEN Study にログインします。開いたブラウザでログインしてください。
 ".venv\Scripts\python.exe" zengauge.py login || goto fail
 
 echo.
-echo 4/4 30分ごとの自動更新を登録しています…
-".venv\Scripts\python.exe" zengauge.py schedule || goto fail
-
-echo.
-echo 完了しました。PC が起きている間、30分ごとに進捗が iCloud 経由で iPhone に届きます。
-echo やめるときは stop-windows.bat をダブルクリックしてください。
+echo ブラウザに出た QR コードを、iPhone のカメラで読み取ってください。
+echo iPhone に「ログインできました」と出たら完了です。この画面とブラウザは閉じて大丈夫です。
 pause
 exit /b 0
 

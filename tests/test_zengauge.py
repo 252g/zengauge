@@ -12,7 +12,9 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from zengauge import api, paths, session, summary, sync  # noqa: E402
+from urllib.parse import parse_qs, unquote, urlparse  # noqa: E402
+
+from zengauge import qr, session, summary  # noqa: E402
 
 WIDGET = ROOT / "scriptable" / "ZEN Study進捗.js"
 
@@ -118,37 +120,30 @@ class SessionAndSyncTests(unittest.TestCase):
         session.import_storage_state(source)
         self.assertEqual([c["name"] for c in session.load_cookies()], ["_zane_session"])
 
-    def test_sync_writes_progress_and_keeps_it_when_login_expires(self):
-        session.import_cookie_header("_zane_session=abc")
-        with mock.patch.object(api, "overview", return_value=OVERVIEW), \
-             mock.patch.object(api, "monthly", return_value=DETAIL) as monthly:
-            status, path = sync.run(self.out)
-        self.assertEqual(status, "ok")
-        monthly.assert_called_once()
-        written = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(written["status"], "ok")
-        self.assertIn("current", written)
+    def test_expiry_comes_from_session_cookie(self):
+        cookies = [{"name": "authority", "value": "1", "expires": 1},
+                   {"name": "_zane_session", "value": "a", "expires": 1900000000}]
+        self.assertEqual(session.expires_at(cookies), datetime.fromtimestamp(1900000000))
+        self.assertIsNone(session.expires_at([{"name": "_zane_session", "value": "a", "expires": -1}]))
 
-        with mock.patch.object(api, "overview", side_effect=api.AuthExpired("ログインが切れています")), \
-             mock.patch.object(sync, "datetime", wraps=datetime) as clock:
-            clock.now.return_value = datetime.now(timezone.utc).replace(year=2099)
-            status, path2 = sync.run(self.out)
-        self.assertEqual(status, "login_required")
-        self.assertNotEqual(path, path2)
-        self.assertEqual(sync.progress_files(self.out), [path2])  # older file cleaned up
-        written = sync.latest(self.out)
-        self.assertEqual(written["status"], "login_required")
-        self.assertEqual(written["current"]["month"], summary.summarize(OVERVIEW, DETAIL, datetime.now(timezone.utc))["current"]["month"])
 
-    def test_sync_without_login(self):
-        status, path = sync.run(self.out)
-        self.assertEqual(status, "login_required")
-        self.assertEqual(sync.latest(self.out)["status"], "login_required")
-        self.assertTrue(path.name.startswith(paths.PROGRESS_PREFIX))
+class QRTests(unittest.TestCase):
+    def test_import_url_opens_widget_script_with_cookie(self):
+        cookie = "_zane_session=ab/c+d=; authority=student"
+        url = qr.import_url(cookie)
+        parsed = urlparse(url)
+        self.assertEqual(parsed.scheme, "scriptable")
+        self.assertEqual(unquote(parsed.path), "/run/ZEN Study進捗")
+        query = parse_qs(parsed.query)
+        self.assertEqual(query["action"], ["import"])
+        self.assertEqual(query["cookie"], [cookie])
 
-    def test_configured_scriptable_dir(self):
-        self.assertEqual(paths.find_scriptable_dir(str(self.out)), self.out)
-        self.assertIsNone(paths.find_scriptable_dir(str(self.home / "missing")))
+    def test_svg_contains_a_qr_code(self):
+        try:
+            import qrcode  # noqa: F401
+        except ModuleNotFoundError:
+            self.skipTest("qrcode unavailable")
+        self.assertIn("<svg", qr.svg(qr.import_url("_zane_session=x")))
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Entry point that works from any working directory (used by launchd / Task Scheduler)."""
+"""Entry point that works from any working directory."""
 import sys
 from pathlib import Path
 

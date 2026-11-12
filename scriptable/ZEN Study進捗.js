@@ -9,11 +9,6 @@ const API = "https://api.nnn.ed.nico/v2/dashboard/report_progresses";
 const WEB_ORIGIN = "https://www.nnn.ed.nico";
 const KEYCHAIN_KEY = "zenstudy.cookie";
 const CACHE_FILE = "zenstudy-progress-cache.json";
-const COOKIE_IMPORT_FILE = "zenstudy-cookie.txt";
-// PC（Mac/Windows）の zengauge が書き出す進捗。これがあればスマホ側のログインは不要。
-// PC は毎回タイムスタンプ付きの新しいファイルを書くので、一番新しいものを読む。
-const SYNC_PREFIX = "zenstudy-progress-sync-";
-const SYNC_FRESH_MINUTES = 75;
 const REFRESH_MINUTES = 30;
 
 const ACCENT = new Color("#30d6b2");
@@ -129,31 +124,6 @@ async function readCache() {
   }
   return null;
 }
-async function readSynced() {
-  try {
-    const fm = FileManager.iCloud();
-    const dir = fm.documentsDirectory();
-    // Files not yet downloaded can be listed as ".name.icloud" placeholders.
-    const names = fm.listContents(dir)
-      .map(n => n.replace(/^\.(.*)\.icloud$/, "$1"))
-      .filter(n => n.startsWith(SYNC_PREFIX) && n.endsWith(".json"))
-      .sort().reverse();
-    for (const name of names) {
-      const path = fm.joinPath(dir, name);
-      try {
-        if (!fm.isFileDownloaded(path)) await fm.downloadFileFromiCloud(path);
-        return JSON.parse(fm.readString(path));
-      } catch {}
-    }
-    return null;
-  } catch { return null; }
-}
-
-function newest(...items) {
-  return items.filter(d => d && d.current)
-    .sort((a, b) => new Date(b.fetchedAt) - new Date(a.fetchedAt))[0] || null;
-}
-
 function writeCache(data) {
   try { const fm = cacheStore(); fm.writeString(cachePath(fm), JSON.stringify(data)); } catch {}
 }
@@ -264,7 +234,7 @@ function footer(stack, data, note) {
   const r = row(stack);
   if (note) text(r, note, Font.mediumSystemFont(10), WARN);
   r.addSpacer();
-  text(r, `${data.source ? "PC " : ""}${clockTime(data.fetchedAt)} 更新`, Font.systemFont(10), SUB);
+  text(r, `${clockTime(data.fetchedAt)} 更新`, Font.systemFont(10), SUB);
 }
 
 // MARK: - ウィジェット
@@ -440,25 +410,16 @@ async function buildWidget(family) {
   }
   let data = null;
   let note = null;
-  const synced = await readSynced();
-  const syncedFresh = synced && synced.status === "ok" && synced.current
-    && now - new Date(synced.fetchedAt) < SYNC_FRESH_MINUTES * 60000;
   try {
-    if (syncedFresh) data = synced;
-    else {
-      data = await fetchProgress(now);
-      writeCache(data);
-    }
+    data = await fetchProgress(now);
+    writeCache(data);
   } catch (error) {
-    data = newest(synced, await readCache());
+    data = await readCache();
     const auth = error instanceof AuthError;
     const hadLogin = !!storedCookie();
     // ログインの問題ならタップでそのままログイン画面を開く。
     if (auth) w.url = `scriptable:///run/${encodeURIComponent(Script.name())}?action=login`;
-    if (auth && hadLogin) note = "ログインが切れています";
-    else if (synced && synced.status === "login_required") note = "PCで再ログイン";
-    else if (synced && data === synced) note = "PCの更新待ち";
-    else note = auth ? "ログインが必要です" : "更新できませんでした";
+    note = auth ? (hadLogin ? "ログインが切れています" : "ログインが必要です") : "更新できませんでした";
     if (!data) {
       if (accessory) text(w, auth ? `ZEN Study ${hadLogin ? "ログイン切れ" : "要ログイン"}` : "ZEN Study 取得失敗", Font.systemFont(12));
       else if (auth) buildMessage(w, hadLogin ? "ログインが切れています" : "ログインが必要です", "タップしてログインしてください。");
@@ -483,50 +444,32 @@ async function showMessage(title, message) {
   await alert.present();
 }
 
-async function setCookieFromClipboard() {
-  const value = (Pasteboard.paste() || "").trim();
-  if (!/_zane_session=/.test(value)) {
-    await showMessage("Cookieが見つかりません",
-      "「_zane_session=…; …」の形のログイン Cookie をコピーしてから、もう一度実行してください。");
+// PC の zengauge がログイン後に表示する QR コードから開かれる（scriptable:///run/...?action=import&cookie=...）。
+// 読み込んだログイン情報で実際に取得できたときだけ保存する。
+async function importFromQR(value) {
+  // Scriptable normally decodes query parameters already; decode again only if it did not.
+  let cookie = String(value || "").trim();
+  if (/%3D/i.test(cookie)) { try { cookie = decodeURIComponent(cookie); } catch {} }
+  if (!/(^|;\s*)_zane_session=[^;]+/.test(cookie)) {
+    await showMessage("読み込めませんでした", "QR コードの中身が ZEN Study のログイン情報ではありませんでした。");
     return;
   }
-  Pasteboard.copy("");
-  await saveCookie(value);
-}
-
-// Universal Clipboard が届かない時の代替。読み込んだら iCloud 上の一時ファイルはすぐ消す。
-async function setCookieFromICloudFile() {
-  const fm = FileManager.iCloud();
-  const path = fm.joinPath(fm.documentsDirectory(), COOKIE_IMPORT_FILE);
-  if (!fm.fileExists(path)) {
-    await showMessage("ファイルが見つかりません",
-      `ログイン Cookie を書いたファイルを Scriptable の iCloud フォルダへ「${COOKIE_IMPORT_FILE}」として置き、同期を待ってから実行してください。`);
-    return;
-  }
-  await fm.downloadFileFromiCloud(path);
-  const value = (fm.readString(path) || "").trim();
-  fm.remove(path);
-  if (!/_zane_session=/.test(value)) {
-    await showMessage("Cookieが見つかりません", "ファイルの中身が ZEN Study のログイン情報ではありませんでした。");
-    return;
-  }
-  await saveCookie(value);
-}
-
-async function saveCookie(value) {
-  Keychain.set(KEYCHAIN_KEY, value);
-  const alert = new Alert();
+  const confirm = new Alert();
+  confirm.title = "PC のログインを使いますか？";
+  confirm.message = "QR コードから読み込んだ ZEN Study のログイン情報を、この iPhone に保存します。";
+  confirm.addAction("保存する");
+  confirm.addCancelAction("やめる");
+  if (await confirm.present() < 0) return;
   try {
-    const data = await fetchProgress(new Date());
+    const data = await fetchProgress(new Date(), cookie);
+    Keychain.set(KEYCHAIN_KEY, cookie);
     writeCache(data);
-    alert.title = "設定しました";
-    alert.message = `${data.current.month}月レポート ${data.current.chaptersPassed}/${data.current.chaptersTotal}`;
+    await showMessage("ログインできました", `${progressLine(data)}\n\nウィジェットは次の更新（30分以内）から反映されます。PC はもう閉じて大丈夫です。`);
   } catch (error) {
-    alert.title = "保存しましたが取得に失敗しました";
-    alert.message = String(error.message || error);
+    await showMessage("ログインできませんでした", error instanceof AuthError
+      ? "このログイン情報はもう使えません。PC でもう一度ログインして、新しい QR コードを読み取ってください。"
+      : String(error.message || error));
   }
-  alert.addAction("OK");
-  await alert.present();
 }
 
 // MARK: - スマホでログイン
@@ -632,14 +575,14 @@ async function loginOnPhone() {
 async function runInApp() {
   const menu = new Alert();
   menu.title = "ZEN Study 進捗";
-  menu.message = storedCookie() ? "ログイン済みです。切れたら「スマホでログイン」で入り直せます。" : "まず「スマホでログイン」を選んでください。";
+  menu.message = storedCookie()
+    ? "ログイン済みです。切れたら「スマホでログイン」か、PC の QR コードで入り直せます。"
+    : "「スマホでログイン」を選ぶか、PC の zengauge が表示する QR コードを iPhone のカメラで読み取ってください。";
   const actions = [
     ["スマホでログイン", loginOnPhone],
     ["プレビュー（中）", async () => (await buildWidget("medium")).presentMedium()],
     ["プレビュー（大）", async () => (await buildWidget("large")).presentLarge()],
     ["プレビュー（小）", async () => (await buildWidget("small")).presentSmall()],
-    ["クリップボードからログイン情報を設定", setCookieFromClipboard],
-    ["iCloudのファイルからログイン情報を設定", setCookieFromICloudFile],
     ["ログイン情報を削除", async () => { if (Keychain.contains(KEYCHAIN_KEY)) Keychain.remove(KEYCHAIN_KEY); }],
   ];
   for (const [title] of actions) menu.addAction(title);
@@ -654,6 +597,8 @@ if (config.runsInWidget || config.runsInAccessoryWidget) {
   (await buildWidget("large")).presentLarge();
 } else if (args.queryParameters && args.queryParameters.action === "login") {
   await loginOnPhone();
+} else if (args.queryParameters && args.queryParameters.action === "import") {
+  await importFromQR(args.queryParameters.cookie);
 } else {
   await runInApp();
 }

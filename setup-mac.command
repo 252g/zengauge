@@ -1,5 +1,5 @@
 #!/bin/bash
-# ダブルクリックで zengauge の準備（PC 側）をすべて行う。ログインし直すときも、これをもう一度開く。
+# ダブルクリックで ZEN Study にログインし、iPhone に送る QR コードを表示する。ログインし直すときも、これをもう一度開く。
 cd "$(dirname "$0")" || exit 1
 
 finish() {
@@ -28,23 +28,19 @@ if [ -z "$PY" ]; then
   finish 1
 fi
 
-echo "1/4 準備用のフォルダを作っています…"
+echo "1/3 準備用のフォルダを作っています…"
 if [ ! -x .venv/bin/python ]; then
   "$PY" -m venv .venv || { echo "作れませんでした。"; finish 1; }
 fi
 
-echo "2/4 必要なものを入れています…"
+echo "2/3 必要なものを入れています…"
 .venv/bin/python -m pip install --quiet --disable-pip-version-check -r requirements.txt ||
   { echo "入れられませんでした。ネットにつながっているか確かめてください。"; finish 1; }
 
-echo "3/4 ZEN Study にログインします。開いたブラウザでログインしてください。"
+echo "3/3 ZEN Study にログインします。開いたブラウザでログインしてください。"
 .venv/bin/python zengauge.py login || finish 1
 
 echo
-echo "4/4 30分ごとの自動更新を登録しています…"
-.venv/bin/python zengauge.py schedule || finish 1
-
-echo
-echo "完了しました。Mac が起きている間、30分ごとに進捗が iPhone に届きます。"
-echo "やめるときは stop-mac.command をダブルクリックしてください。"
+echo "ブラウザに出た QR コードを、iPhone のカメラで読み取ってください。"
+echo "iPhone に「ログインできました」と出たら完了です。この画面とブラウザは閉じて大丈夫です。"
 finish 0

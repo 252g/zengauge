@@ -43,6 +43,15 @@ def cookie_header(cookies: list[dict]) -> str:
     return header
 
 
+def expires_at(cookies: list[dict]) -> "datetime | None":
+    """When the session cookie expires, if the server gave it an expiry."""
+    from datetime import datetime
+    for c in cookies:
+        if c.get("name") == "_zane_session" and (c.get("expires") or -1) > 0:
+            return datetime.fromtimestamp(c["expires"])
+    return None
+
+
 def save_storage_state(state: dict, path: Path | None = None) -> Path:
     path = path or paths.storage_state_path()
     _write_private(path, json.dumps(state, ensure_ascii=False))
